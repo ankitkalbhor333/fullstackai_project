@@ -1,0 +1,7 @@
+pandas
+scikit-learn
+networkx
+fastapi
+uvicorn
+requests
+sentence-transformers

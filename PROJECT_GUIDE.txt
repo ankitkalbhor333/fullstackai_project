@@ -1,0 +1,198 @@
+SATI CYBERSHIELD - PROJECT STRUCTURE AND RUN GUIDE
+=================================================
+
+WHAT THIS PROJECT DOES
+----------------------
+The main application retrieves social-media posts, analyzes possible
+coordination patterns, and displays the results in a React dashboard.
+The Python FastAPI service performs retrieval and analysis; the React
+application presents the results in a browser.
+
+
+PROJECT LAYOUT
+--------------
+
+ragproject/
+|-- README.md
+|-- PROJECT_GUIDE.txt
+|-- .gitignore
+|-- start_platform.bat
+|-- start_platform.ps1
+|-- .venv/                         Local Python environment (if present)
+|-- anti_campaign_detector/        Main Python API and analysis pipeline
+|   |-- main.py                    FastAPI routes and combined threat score
+|   |-- requirements.txt           Python dependencies
+|   |-- package.json               Additional Node manifest; not needed by the
+|   |                               documented Python startup commands
+|   |-- package-lock.json
+|   |-- data/
+|   |   |-- retrieved_posts.json   Local fallback posts
+|   |-- retriever/
+|   |   |-- rag_pipeline.py        Fetches posts and filters by search query
+|   |   |-- __init__.py
+|   |-- detector/
+|   |   |-- frequency.py           Hashtag and account counts
+|   |   |-- similarity.py          Similar-text detection
+|   |   |-- timeburst.py           Posting-time burst detection
+|   |   |-- graph_detect.py        Account/hashtag graph clusters
+|   |   |-- spread_analysis.py     Spreader scoring
+|   |-- templates/
+|   |   |-- index.html             Standalone/simple HTML page
+|   |-- utils/
+|       |-- helpers.py             Shared helper functions
+|-- my-dashboard/                  Main React dashboard
+|   |-- package.json               Frontend dependencies and npm commands
+|   |-- package-lock.json           Locked frontend dependency versions
+|   |-- server.js                  Serves the built app and provides an API proxy
+|   |-- public/                    Static HTML, icons, and browser metadata
+|   |-- src/
+|       |-- index.js               React application entry point
+|       |-- App.js                 Routes to the dashboard
+|       |-- App.css, index.css     General application styles
+|       |-- dashboard/
+|           |-- Dashboard.jsx      Search UI, API request, and chart layout
+|           |-- dashboard.css      Dashboard styles
+|           |-- components/        Individual tables, charts, and graphs
+|               |-- PostsTable.jsx
+|               |-- TopHashtags.jsx
+|               |-- AccountsChart.jsx
+|               |-- FrequencyChart.jsx
+|               |-- SpreadersChart.jsx
+|               |-- SimilarityGraph.jsx
+|               |-- ClusterGraph.jsx
+|               |-- ThreatBadge.jsx
+|               |-- poststable.css
+|-- rag-demo/                      Separate PDF/RAG experiment; not required
+    |                               to run the main dashboard
+    |-- documentation.txt          RAG demo notes
+    |-- server.js, index.js,
+    |   query.js                   Node demo scripts
+    |-- fastapi.py, pdf_api.py     Python demo scripts
+    |-- retrievedPosts.pdf        Demo document
+    |-- package.json,
+    |   package-lock.json          Demo-specific Node dependencies
+    |-- .env                       Local configuration; do not share/commit keys
+    |-- env/                       Demo's local Python environment, if present
+
+Generated or machine-specific folders such as node_modules/, build/, and
+Python virtual environments are not source code. They may be ignored by Git
+and need to be recreated on another computer.
+
+
+HOW THE MAIN APPLICATION WORKS
+------------------------------
+1. The dashboard sends GET /detect?query=... to the Python API.
+2. retriever/rag_pipeline.py tries the configured remote posts API. If it is
+   unavailable, it loads anti_campaign_detector/data/retrieved_posts.json.
+3. detector/ runs the hashtag/account, similarity, time-burst, graph, and
+   spreader analyses.
+4. main.py combines the results, calculates a threat score, and returns JSON.
+5. Dashboard.jsx renders the posts, charts, and graphs.
+
+The remote retrieval requires internet access. Local fallback data allows
+retrieval to continue when that service cannot be reached.
+
+
+REQUIREMENTS
+------------
+- Windows PowerShell
+- Python 3 and pip
+- Node.js and npm
+- Internet access for the remote retrieval API and initial dependency installs
+
+
+FIRST-TIME SETUP
+----------------
+Run these commands from the ragproject folder (the folder containing this
+file). If a local .venv already exists, you can reuse it.
+
+1. Create and install Python dependencies:
+
+   py -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install --upgrade pip
+   .\.venv\Scripts\python.exe -m pip install -r .\anti_campaign_detector\requirements.txt
+
+2. Install frontend dependencies and create the static frontend build:
+
+   Set-Location .\my-dashboard
+   npm ci
+   npm run build
+
+   Return to the project root before starting the services:
+
+   Set-Location ..
+
+
+START THE MAIN PLATFORM
+-----------------------
+Use two PowerShell terminals. In both terminals, begin in the ragproject
+folder. Keep both terminals open while using the application.
+
+Terminal 1 - Python backend:
+
+   Set-Location .\anti_campaign_detector
+   ..\.venv\Scripts\python.exe main.py
+
+The API listens on http://localhost:8001. Check it at:
+
+   http://localhost:8001/health
+
+Terminal 2 - React dashboard:
+
+   Set-Location .\my-dashboard
+   npm run serve
+
+Open this address in a browser:
+
+   http://localhost:3000
+
+The dashboard's default search is "khalistan". Submit another term in the
+search box to run a different query.
+
+For frontend development with automatic rebuild/reload, use "npm start"
+instead of "npm run serve" in Terminal 2. The backend must still be running.
+
+
+IMPORTANT STARTUP DETAILS
+-------------------------
+- main.py starts Uvicorn on port 8001 by default. Dashboard.jsx also calls
+  port 8001 by default, so the two main application parts agree.
+- npm run serve serves the generated build/ directory. Run "npm run build"
+  after a clean install or after frontend changes before using this command.
+- The launcher scripts currently expect a virtual environment at
+  anti_campaign_detector\venv\Scripts\python.exe. A root-level .venv does not
+  satisfy that path. Use the manual commands above unless that backend-local
+  environment has been created.
+- my-dashboard/server.js has an API proxy defaulting to backend port 8000,
+  while the current Dashboard.jsx calls port 8001 directly. The dashboard
+  does not need that proxy for its current API request. If you choose to use
+  the proxy for /detect requests, configure BACKEND_URL to
+  http://127.0.0.1:8001.
+- rag-demo is a separate experiment. It has its own dependencies and may
+  require Google/Pinecone credentials in its local .env. Those credentials
+  are not needed for the main dashboard; never commit real API keys.
+
+
+USEFUL API ROUTES
+-----------------
+GET http://localhost:8001/          API service status
+GET http://localhost:8001/health    Health check
+GET http://localhost:8001/detect?query=khalistan
+                                    Run retrieval and campaign analysis
+
+
+WHERE TO MAKE CHANGES
+---------------------
+- API routes and threat-score aggregation: anti_campaign_detector/main.py
+- Retrieval and fallback behavior: anti_campaign_detector/retriever/
+- Detection algorithms: anti_campaign_detector/detector/
+- Sample fallback posts: anti_campaign_detector/data/
+- Dashboard screen and API call: my-dashboard/src/dashboard/Dashboard.jsx
+- Charts, tables, and graphs: my-dashboard/src/dashboard/components/
+- Overall React entry/routing: my-dashboard/src/App.js and src/index.js
+- Separate PDF/vector-search demo: rag-demo/
+
+
+STOPPING THE APPLICATION
+------------------------
+Press Ctrl+C in each terminal running the backend and dashboard.
